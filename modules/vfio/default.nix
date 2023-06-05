@@ -47,6 +47,12 @@ in
       SUBSYSTEM=="vfio", OWNER="root", GROUP="kvm"
     '';
 
+    boot.kernelModules = [
+      "vfio"
+      "vfio_pci"
+      "vfio_iommu_type1"
+      "vfio_virqfd"
+    ];
     boot.kernelParams = (if cfg.IOMMUType == "intel" then [
       "intel_iommu=on"
       "intel_iommu=igfx_off"

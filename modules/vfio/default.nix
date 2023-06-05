@@ -1,7 +1,8 @@
 { lib, pkgs, config, ... }:
 with lib;
 let cfg = config.virtualisation.vfio;
-in {
+in
+{
   options.virtualisation.vfio = {
     enable = mkEnableOption "VFIO Configuration";
     IOMMUType = mkOption {
@@ -33,6 +34,12 @@ in {
       description =
         "Enables or disables kvm guest access to model-specific registers";
     };
+    applyACSpatch = mkOption {
+      type = types.bool;
+      default = false;
+      example = true;
+      description = "Apply ACS patches to split devices in the same IOMMU group";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -45,15 +52,15 @@ in {
       "intel_iommu=igfx_off"
     ] else
       [ "amd_iommu=on" ]) ++ (optional (builtins.length cfg.devices > 0)
-        ("vfio-pci.ids=" + builtins.concatStringsSep "," cfg.devices))
-      ++ (optionals cfg.applyACSpatch [
-        "pcie_acs_override=downstream,multifunction"
-        "pci=nomsi"
-      ]) ++ (optional cfg.disableEFIfb "video=efifb:off")
-      ++ (optionals cfg.ignoreMSRs [
-        "kvm.ignore_msrs=1"
-        "kvm.report_ignored_msrs=0"
-      ]);
+      ("vfio-pci.ids=" + builtins.concatStringsSep "," cfg.devices))
+    ++ (optionals cfg.applyACSpatch [
+      "pcie_acs_override=downstream,multifunction"
+      "pci=nomsi"
+    ]) ++ (optional cfg.disableEFIfb "video=efifb:off")
+    ++ (optionals cfg.ignoreMSRs [
+      "kvm.ignore_msrs=1"
+      "kvm.report_ignored_msrs=0"
+    ]);
 
     boot.blacklistedKernelModules =
       optionals cfg.blacklistNvidia [ "nvidia" "nouveau" ];

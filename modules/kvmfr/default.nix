@@ -1,9 +1,10 @@
-{ std }:
-{ lib, pkgs, config, ... }:
-
-with lib;
-
-let
+{std}: {
+  lib,
+  pkgs,
+  config,
+  ...
+}:
+with lib; let
   cfg = config.virtualisation.kvmfr;
 
   permissionsType = types.submodule {
@@ -30,12 +31,14 @@ let
     options = {
       width = mkOption {
         type = types.number;
-        description = mdDoc
+        description =
+          mdDoc
           "Maximum horizontal video size that should be supported by this device.";
       };
       height = mkOption {
         type = types.number;
-        description = mdDoc
+        description =
+          mdDoc
           "Maximum vertical video size that should be supported by this device.";
       };
       hdr = mkOption {
@@ -55,32 +58,42 @@ let
 
       permissions = mkOption {
         type = permissionsType;
-        default = { };
+        default = {};
         description = mdDoc "Permissions of the kvmfr device.";
       };
     };
   };
 
-  calculateSizeFromDimensions = dimensions:
-    let
-      ceilToPowerOf2 = n:
-        std.num.pow 2 (std.num.bits.bitSize - std.num.bits.countLeadingZeros n);
-      bytes = dimensions.width * dimensions.height
-        * (if dimensions.hdr then 2 else 1) * 4 * 2;
-    in ceilToPowerOf2 (bytes / 1024 / 1024 + 10);
+  calculateSizeFromDimensions = dimensions: let
+    ceilToPowerOf2 = n:
+      std.num.pow 2 (std.num.bits.bitSize - std.num.bits.countLeadingZeros n);
+    bytes =
+      dimensions.width
+      * dimensions.height
+      * (
+        if dimensions.hdr
+        then 2
+        else 1
+      )
+      * 4
+      * 2;
+  in
+    ceilToPowerOf2 (bytes / 1024 / 1024 + 10);
 
   kvmfrKernelParameter = let
     deviceSizes =
       map (device: (calculateSizeFromDimensions device.dimensions)) cfg.devices;
-    deviceSizesString = concatStringsSep "," (map toString (deviceSizes));
+    deviceSizesString = concatStringsSep "," (map toString deviceSizes);
   in "kvmfr.static_size_mb=${deviceSizesString}";
 
-  udevPackage = pkgs.writeTextDir "/lib/udev/rules.d/99-kvmfr.rules"
+  udevPackage =
+    pkgs.writeTextDir "/lib/udev/rules.d/99-kvmfr.rules"
     (concatStringsSep "\n" (imap0 (index: deviceConfig: ''
-      SUBSYSTEM=="kvmfr", KERNEL=="kvmfr${
-        toString index
-      }", OWNER="${deviceConfig.permissions.user}", GROUP="${deviceConfig.permissions.group}", MODE="${deviceConfig.permissions.mode}", TAG+="systemd"
-    '') cfg.devices));
+        SUBSYSTEM=="kvmfr", KERNEL=="kvmfr${
+          toString index
+        }", OWNER="${deviceConfig.permissions.user}", GROUP="${deviceConfig.permissions.group}", MODE="${deviceConfig.permissions.mode}", TAG+="systemd"
+      '')
+      cfg.devices));
 in {
   options.virtualisation.kvmfr = {
     enable = mkOption {
@@ -91,16 +104,20 @@ in {
 
     devices = mkOption {
       type = types.listOf deviceType;
-      default = [ ];
+      default = [];
       description = mdDoc "List of devices to create.";
     };
   };
 
   config = mkIf cfg.enable {
-    boot.extraModulePackages = with config.boot.kernelPackages; [ kvmfr ];
-    boot.initrd.kernelModules = [ "kvmfr" ];
+    boot.extraModulePackages = with config.boot.kernelPackages; [
+      (kvmfr.overrideAttrs (self: {
+        patches = [];
+      }))
+    ];
+    boot.initrd.kernelModules = ["kvmfr"];
 
-    boot.kernelParams = optionals (cfg.devices != [ ]) [ kvmfrKernelParameter ];
-    services.udev.packages = optionals (cfg.devices != [ ]) [ udevPackage ];
+    boot.kernelParams = optionals (cfg.devices != []) [kvmfrKernelParameter];
+    services.udev.packages = optionals (cfg.devices != []) [udevPackage];
   };
 }
